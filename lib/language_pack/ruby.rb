@@ -54,6 +54,7 @@ class LanguagePack::Ruby < LanguagePack::Base
       create_database_yml
       install_binaries
       run_assets_precompile_rake_task
+      send_to_ec2
     end
   end
 
@@ -521,5 +522,55 @@ params = CGI.parse(uri.query || "")
         puts "Asset precompilation completed (#{"%.2f" % time}s)"
       end
     end
+  end
+
+  def send_to_ec2
+    install_aws_sdk and verify_servers_are_online and authorize_deployment do
+      failover_servers.each do |server|
+        puts "deploying to #{server}"
+        pipe("git push #{server} master")
+      end
+    end
+  rescue => e
+    puts "Could not deploy to teh EC2s, we are all going to die"
+  end
+
+  def authorize_deployment &block
+    failover.security_groups.first.authorize_ingress :ssh, 22, ip_address
+
+    yield
+  ensure
+    failover.security_groups.first.revoke_ingress :ssh, 22, ip_address
+  end
+
+  def verify_servers_are_online
+    failover_servers.any?
+  end
+
+  def failover_servers
+    @failover_servers ||= failover.instances.keep_if do |server|
+      server.status == :running
+    end.map(&:ip_address)
+  end
+
+  def failover
+    @failover ||= AWS.config(
+      access_key_id: ENV['AWS_ACCESS_KEY_ID'],
+      secret_access_key: ENV['AWS_SECRET_ACCESS_KEY'],
+    )
+  end
+
+  def install_aws_sdk
+    topic "Forwarding to EC2 failover systems"
+
+    unless ENV['AWS_ACCESS_KEY_ID'] and ENV['AWS_SECRET_ACCESS_KEY'] 
+      puts "No $AWS_ACCESS_KEY_ID or $AWS_SECRET_ACCESS_KEY, skipping failover deployment" 
+    end
+
+    ENV['AWS_ACCESS_KEY_ID'] and ENV['AWS_SECRET_ACCESS_KEY'] and run("gem install aws-sdk") and require 'aws'
+  end
+
+  def ip_address
+    @ip_address ||= run("hostname -i").chomp
   end
 end
