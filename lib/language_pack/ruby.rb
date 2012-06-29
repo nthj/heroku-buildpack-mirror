@@ -563,7 +563,9 @@ params = CGI.parse(uri.query || "")
     puts "Storing on S3"
     pipe("
       cd ..;
-      chmod +x #{s3_tools_dir}/s3
+      chmod +x #{s3_tools_dir}/s3; 
+      S3_ACCESS_KEY_ID=#{ENV['AWS_ACCESS_KEY_ID']} 
+      S3_SECRET_ACCESS_KEY=#{ENV['AWS_SECRET_ACCESS_KEY']} 
       #{s3_tools_dir}/s3 put #{ENV['AWS_S3_RELEASES_BUCKET']} #{base}.tar.gz #{base}.tar.gz"
     )
   end
