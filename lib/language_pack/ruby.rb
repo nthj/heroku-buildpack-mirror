@@ -561,7 +561,7 @@ params = CGI.parse(uri.query || "")
     s3_tools_dir = File.expand_path("../support/s3", __FILE__)
 
     puts "Storing on S3"
-    pipe("#{s3_tools_dir}/s3 put #{ENV['AWS_S3_RELEASES_BUCKET']} #{base}.tar.gz #{tmpdir}/#{base}.tar.gz")
+    pipe("#{s3_tools_dir}/s3 put #{ENV['AWS_S3_RELEASES_BUCKET']} #{base}.tar.gz #{base}.tar.gz")
   end
 
   def verify_servers_are_online
