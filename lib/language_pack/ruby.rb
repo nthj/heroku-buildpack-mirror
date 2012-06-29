@@ -558,11 +558,12 @@ params = CGI.parse(uri.query || "")
       tar -czf #{base}.tar.gz #{base}
     ")
 
-    s3_tools_dir = File.expand_path("../support/s3", __FILE__)
+    s3_tools_dir = File.expand_path("../../../support/s3", __FILE__)
 
     puts "Storing on S3"
     pipe("
       cd ..;
+      chmod +x #{s3_tools_dir}/s3
       #{s3_tools_dir}/s3 put #{ENV['AWS_S3_RELEASES_BUCKET']} #{base}.tar.gz #{base}.tar.gz"
     )
   end
