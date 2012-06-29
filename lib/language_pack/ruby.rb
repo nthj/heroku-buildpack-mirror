@@ -525,14 +525,12 @@ params = CGI.parse(uri.query || "")
   end
 
   def send_to_ec2
-    install_aws_sdk and verify_servers_are_online and authorize_deployment do
-      puts 'whatup peeps'
+    store_slug and verify_servers_are_online and authorize_deployment do
       failover_servers.each do |server|
-        puts "deploying to #{server}"
-        pipe("ls -a")
-        pipe("git push #{server} master")
+        puts "Deploying to #{server}"
+        pipe("ssh -i ~/.ssh/ec2 root@#{server} 'deploy'")
       end
-    end
+    end if sdk_available?
   rescue StandardError, LoadError => e
     puts "Could not deploy to teh EC2s, we are all going to die"
     puts "#{e.class.name}: #{e.message}"
@@ -551,9 +549,22 @@ params = CGI.parse(uri.query || "")
     # failover.delete_key_pair key_name: "mykey"
   end
 
+  def store_slug
+    base = File.basename Dir.pwd
+
+    puts "Capturing slug archive"
+    pipe(" 
+      cd ..; 
+      tar -czf #{base}.tar.gz #{base}
+    ")
+
+    puts "Storing on S3"
+    s3_put ENV['AWS_S3_RELEASES_BUCKET'], "#{base}.tar.gz", "#{base}.tar.gz"
+  end
+
   def verify_servers_are_online
     unless failover_servers.any?
-      puts "No servers are online, skipping"
+      puts "No servers are online, deployment pending server spool-up"
     end
 
     failover_servers.any?
@@ -572,15 +583,18 @@ params = CGI.parse(uri.query || "")
     )
   end
 
-  def install_aws_sdk
+  def sdk_available?
     topic "Forwarding to EC2 failover systems"
 
-    unless ENV['AWS_ACCESS_KEY_ID'] and ENV['AWS_SECRET_ACCESS_KEY'] 
-      puts "No $AWS_ACCESS_KEY_ID or $AWS_SECRET_ACCESS_KEY, skipping failover deployment" 
+    unless ENV['AWS_ACCESS_KEY_ID'] && ENV['AWS_SECRET_ACCESS_KEY'] && ENV['AWS_S3_RELEASES_BUCKET']
+      puts "No $AWS_ACCESS_KEY_ID, $AWS_SECRET_ACCESS_KEY, or $AWS_S3_RELEASES_BUCKET, skipping failover deployment" 
+
+      return
     end
 
-    ENV['AWS_ACCESS_KEY_ID'] and ENV['AWS_SECRET_ACCESS_KEY'] and require 'aws'
+    require 'aws'
   rescue LoadError
+    # TODO: Cache gem installs
     puts "Could not find aws-sdk gem, installing"
     pipe("gem install aws-sdk --no-ri --no-rdoc")
     Gem.clear_paths
