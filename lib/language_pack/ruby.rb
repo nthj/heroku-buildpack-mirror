@@ -558,8 +558,10 @@ params = CGI.parse(uri.query || "")
       tar -czf #{base}.tar.gz #{base}
     ")
 
+    s3_tools_dir = File.expand_path("../support/s3", __FILE__)
+
     puts "Storing on S3"
-    s3_put ENV['AWS_S3_RELEASES_BUCKET'], "#{base}.tar.gz", "#{base}.tar.gz"
+    pipe("#{s3_tools_dir}/s3 put #{ENV['AWS_S3_RELEASES_BUCKET']} #{base}.tar.gz #{tmpdir}/#{base}.tar.gz")
   end
 
   def verify_servers_are_online
@@ -588,7 +590,7 @@ params = CGI.parse(uri.query || "")
 
     unless ENV['AWS_ACCESS_KEY_ID'] && ENV['AWS_SECRET_ACCESS_KEY'] && ENV['AWS_S3_RELEASES_BUCKET']
       puts "No $AWS_ACCESS_KEY_ID, $AWS_SECRET_ACCESS_KEY, or $AWS_S3_RELEASES_BUCKET, skipping failover deployment" 
-
+      puts "Try running `heroku labs:enable user_env_compile` to make variables available"
       return
     end
 
