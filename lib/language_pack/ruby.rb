@@ -50,10 +50,10 @@ class LanguagePack::Ruby < LanguagePack::Base
     setup_language_pack_environment
     allow_git do
       install_language_pack_gems
-      build_bundler
-      create_database_yml
-      install_binaries
-      run_assets_precompile_rake_task
+      # build_bundler
+      # create_database_yml
+      # install_binaries
+      # run_assets_precompile_rake_task
       send_to_ec2
     end
   end
@@ -526,35 +526,47 @@ params = CGI.parse(uri.query || "")
 
   def send_to_ec2
     install_aws_sdk and verify_servers_are_online and authorize_deployment do
+      puts 'whatup peeps'
       failover_servers.each do |server|
         puts "deploying to #{server}"
+        pipe("ls -a")
         pipe("git push #{server} master")
       end
     end
-  rescue => e
+  rescue StandardError, LoadError => e
     puts "Could not deploy to teh EC2s, we are all going to die"
+    puts "#{e.class.name}: #{e.message}"
   end
 
   def authorize_deployment &block
-    failover.security_groups.first.authorize_ingress :ssh, 22, ip_address
+    # failover.key_pairs.create("mykey").tap do |key_pair|
+    #   File.open("~/.ssh/ec2", "w") do |file|
+    #     file.write key_pair.private_key
+    #   end
+    # end
 
     yield
   ensure
-    failover.security_groups.first.revoke_ingress :ssh, 22, ip_address
+    # FIXME
+    # failover.delete_key_pair key_name: "mykey"
   end
 
   def verify_servers_are_online
+    unless failover_servers.any?
+      puts "No servers are online, skipping"
+    end
+
     failover_servers.any?
   end
 
   def failover_servers
-    @failover_servers ||= failover.instances.keep_if do |server|
+    @failover_servers ||= failover.instances.select do |server|
       server.status == :running
     end.map(&:ip_address)
   end
 
   def failover
-    @failover ||= AWS.config(
+    @failover ||= AWS::EC2.new(
       access_key_id: ENV['AWS_ACCESS_KEY_ID'],
       secret_access_key: ENV['AWS_SECRET_ACCESS_KEY'],
     )
@@ -567,7 +579,13 @@ params = CGI.parse(uri.query || "")
       puts "No $AWS_ACCESS_KEY_ID or $AWS_SECRET_ACCESS_KEY, skipping failover deployment" 
     end
 
-    ENV['AWS_ACCESS_KEY_ID'] and ENV['AWS_SECRET_ACCESS_KEY'] and run("gem install aws-sdk") and require 'aws'
+    ENV['AWS_ACCESS_KEY_ID'] and ENV['AWS_SECRET_ACCESS_KEY'] and require 'aws'
+  rescue LoadError
+    puts "Could not find aws-sdk gem, installing"
+    pipe("gem install aws-sdk --no-ri --no-rdoc")
+    Gem.clear_paths
+
+    require 'aws'
   end
 
   def ip_address
