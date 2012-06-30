@@ -528,7 +528,7 @@ params = CGI.parse(uri.query || "")
     store_slug and verify_servers_are_online and authorize_deployment do
       failover_servers.each do |server|
         puts "Deploying to #{server}"
-        pipe("ssh -i ec2 root@#{server} 'deploy'")
+        pipe("ssh -i ec2 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@#{server} 'deploy'")
       end
     end if sdk_available?
   rescue StandardError, LoadError => e
