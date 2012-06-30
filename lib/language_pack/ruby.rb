@@ -555,19 +555,16 @@ params = CGI.parse(uri.query || "")
     puts "Capturing slug archive"
     pipe(" 
       cd ..; 
-      tar -czf #{base}.tar.gz #{base}
+      tar -czf #{base}.tgz #{base}
     ")
 
     s3_tools_dir = File.expand_path("../../../support/s3", __FILE__)
 
     puts "Storing on S3"
-    pipe("
-      cd ..;
-      chmod +x #{s3_tools_dir}/s3; 
-      export S3_ACCESS_KEY_ID=#{ENV['AWS_ACCESS_KEY_ID']};
-      export S3_SECRET_ACCESS_KEY=#{ENV['AWS_SECRET_ACCESS_KEY']};
-      #{s3_tools_dir}/s3 put #{ENV['AWS_S3_RELEASES_BUCKET']} #{base}.tar.gz #{base}.tar.gz"
-    )
+    AWS::S3.new(
+      access_key_id: ENV['AWS_ACCESS_KEY_ID'],
+      secret_access_key: ENV['AWS_SECRET_ACCESS_KEY'],
+    ).buckets[ENV['AWS_S3_RELEASES_BUCKET']].objects["#{base}.tgz"].write File.read "../#{base}.tgz"
   end
 
   def verify_servers_are_online
