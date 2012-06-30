@@ -545,7 +545,9 @@ params = CGI.parse(uri.query || "")
 
     yield
   ensure
-    failover.delete_key_pair key_name: failover_key_name
+    failover.key_pairs.each do |key_pair|
+      key_pair.delete if key_pair.name == failover_key_name
+    end
   end
 
   def store_slug
