@@ -528,7 +528,7 @@ params = CGI.parse(uri.query || "")
     store_slug and verify_servers_are_online and authorize_deployment do
       failover_servers.each do |server|
         puts "Deploying to #{server}"
-        pipe("ssh -i ~/.ssh/ec2 root@#{server} 'deploy'")
+        pipe("ssh -i ec2 root@#{server} 'deploy'")
       end
     end if sdk_available?
   rescue StandardError, LoadError => e
@@ -537,16 +537,15 @@ params = CGI.parse(uri.query || "")
   end
 
   def authorize_deployment &block
-    # failover.key_pairs.create("mykey").tap do |key_pair|
-    #   File.open("~/.ssh/ec2", "w") do |file|
-    #     file.write key_pair.private_key
-    #   end
-    # end
+    failover.key_pairs.create(failover_key_name).tap do |key_pair|
+      File.open("ec2", "w") do |file|
+        file.write key_pair.private_key
+      end
+    end
 
     yield
   ensure
-    # FIXME
-    # failover.delete_key_pair key_name: "mykey"
+    failover.delete_key_pair key_name: failover_key_name
   end
 
   def store_slug
@@ -573,6 +572,10 @@ params = CGI.parse(uri.query || "")
     end
 
     failover_servers.any?
+  end
+
+  def failover_key_name
+    @failover_key_name ||= "buildpack-key-#{Time.now.usec}"
   end
 
   def failover_servers
